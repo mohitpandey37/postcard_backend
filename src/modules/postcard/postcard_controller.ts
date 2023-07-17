@@ -3,10 +3,11 @@ const postcardModel = require("./postcard_model");
 import { validationResult } from 'express-validator';
 import { ObjectId } from "mongoose";
 const MyResponse = require('../../helper/response');
-const { jwt_token } = require("../../helper/jwt");
+const { getPostCardJwtToken, jwtverify } = require("../../helper/jwt");
 import isValidObjectId from "../../helper/validateObjectId";
 import { ParsedQs } from 'qs';
 import Pagination from "../../helper/pagination";
+import { triggerAsyncId } from "async_hooks";
 
 // interface for postcard
 interface PostcardInterface {
@@ -58,15 +59,15 @@ let createPostcard = async (req: Request, res: Response) => {
 }
 
 // ============= Get Postcards ================ 
-let getPostCards = async (req: Request, res: Response) => {
+let getAllPostCards = async (req: Request, res: Response) => {
     try {
         const authUser: any = req.headers.authUser;
         const value: string | ParsedQs | string[] | ParsedQs[] = req.query.q || "";
         const filter: any[] = [];
 
         // Pagination calculation
-        let {page, limit, skip}:any = Pagination(req.query);
-        
+        let { page, limit, skip }: any = Pagination(req.query);
+
         // Query null value check
         if (page === 0 || limit === 0) {
             return new MyResponse(422, "page and limit can't be 0.", false).errorResponse(res);
@@ -96,32 +97,53 @@ let getPostCards = async (req: Request, res: Response) => {
 }
 
 // ============= Get Postcard by id ================ 
-let getPostById = async (req: Request, res: Response) => {
+let getPostData = async (req: Request, res: Response) => {
     try {
-        let authUser: any = req.headers.authUser;
-        let postId = req.params.id;
-        let veryfiObjectId = await isValidObjectId(postId);
-        if (veryfiObjectId) {
-            await postcardModel.findOne({ _id: postId, created_by: authUser._id })
-                .then((doc: any) => {
-                    return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
-                }).catch((error: any) => {
-                    return new MyResponse(422, error.message, false).errorResponse(res);
-                })
+        let decoded = await jwtverify(req.params.token);
+        if (!decoded) {
+            return new MyResponse(404, "Link has been expired", false).errorResponse(res)
         } else {
-            return new MyResponse(406, "Invalid ObjectId", false).errorResponse(res);
+            let veryfiObjectId = isValidObjectId(decoded.id);
+            if (veryfiObjectId) {
+                await postcardModel.findOne({ _id: decoded.id })
+                    .then((doc: any) => {
+                        return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
+                    }).catch((error: any) => {
+                        return new MyResponse(422, error.message, false).errorResponse(res);
+                    })
+            } else {
+                return new MyResponse(406, "Invalid ObjectId", false).errorResponse(res);
+            }
         }
-
-
     } catch (error) {
         return new MyResponse(500, "server error", false).errorResponse(res);
-
     }
 
 }
 
+
+// ============= Get Postcard token ================ 
+let getPostCardToken = async (req: Request, res: Response) => {
+    try {
+        let authUser: any = req.headers.authUser;
+        let postId = req.params.id;
+        let veryfiObjectId = isValidObjectId(postId);
+        if (veryfiObjectId) {
+            await postcardModel.findOne({ _id: postId, created_by: authUser._id })
+                .then(async (doc: any) => {
+                    let token = await getPostCardJwtToken(doc._id.toString())
+                    return new MyResponse(200, "Token generated.", true, { token: token }).successResponse(res)
+                }).catch((error: any) => {
+                    return new MyResponse(422, error.message, false).errorResponse(res);
+                })
+        }
+    } catch (error) {
+        return new MyResponse(500, "server error", false).errorResponse(res);
+    }
+}
 module.exports = {
     createPostcard,
-    getPostCards,
-    getPostById
+    getAllPostCards,
+    getPostData,
+    getPostCardToken
 }
