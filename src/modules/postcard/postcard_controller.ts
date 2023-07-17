@@ -5,6 +5,8 @@ import { ObjectId } from "mongoose";
 const MyResponse = require('../../helper/response');
 const { jwt_token } = require("../../helper/jwt");
 import isValidObjectId from "../../helper/validateObjectId";
+import { ParsedQs } from 'qs';
+import Pagination from "../../helper/pagination";
 
 // interface for postcard
 interface PostcardInterface {
@@ -58,24 +60,19 @@ let createPostcard = async (req: Request, res: Response) => {
 // ============= Get Postcards ================ 
 let getPostCards = async (req: Request, res: Response) => {
     try {
-        let authUser: any = req.headers.authUser;
-        let pageParam = req.query.page ? req.query.page : "1";
-        let limitParam = req.query.limit ? req.query.limit : "10";
-        let value = req.query.q ? req.query.q : "";
-        let filter = [];
+        const authUser: any = req.headers.authUser;
+        const value: string | ParsedQs | string[] | ParsedQs[] = req.query.q || "";
+        const filter: any[] = [];
 
-        // query null value check
-        if (pageParam === "0" || limitParam === "0") {
-            return new MyResponse(422, "page and limit can't be 0.", false).errorResponse(res)
+        // Pagination calculation
+        let {page, limit, skip}:any = await Pagination(req.query);
+        
+        // Query null value check
+        if (page === 0 || limit === 0) {
+            return new MyResponse(422, "page and limit can't be 0.", false).errorResponse(res);
         }
 
-        //convert string type into integer
-        let page = typeof pageParam === 'string' ? parseInt(pageParam, 10) : undefined;
-        let limit = typeof limitParam === 'string' ? parseInt(limitParam, 10) : undefined;
-        let skip = typeof page === "number" && page > 1 ? (page - 1) * (typeof limit === "number" ? limit : 0) : 0
-
-
-        // filtering data by recipient name, State, city and zipcode
+        // Searching data by recipient name, state, city or zipcode
         !value ? filter.push({}) :
             filter.push({ recipient: { $regex: value, $options: 'xi' } })
         filter.push({ city: { $regex: value, $options: 'xi' } })
