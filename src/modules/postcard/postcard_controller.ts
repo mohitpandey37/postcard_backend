@@ -65,7 +65,7 @@ let getPostCards = async (req: Request, res: Response) => {
         const filter: any[] = [];
 
         // Pagination calculation
-        let {page, limit, skip}:any = await Pagination(req.query);
+        let {page, limit, skip}:any = Pagination(req.query);
         
         // Query null value check
         if (page === 0 || limit === 0) {
