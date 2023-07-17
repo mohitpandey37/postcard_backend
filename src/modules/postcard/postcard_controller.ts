@@ -4,6 +4,7 @@ import { validationResult } from 'express-validator';
 import { ObjectId } from "mongoose";
 const MyResponse = require('../../helper/response');
 const { jwt_token } = require("../../helper/jwt");
+import isValidObjectId from "../../helper/validateObjectId"; 
 
 // interface for postcard
 interface PostcardInterface {
@@ -77,13 +78,18 @@ let getPostById = async (req:Request, res:Response) =>{
     try {
         let authUser: any = req.headers.authUser;
         let postId = req.params.id;
-        console.log("postId", postId)
-        await postcardModel.findOne({_id: postId})
-        .then((doc:any)=>{
-            return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
-        }).catch((error: any)=>{
-          return new MyResponse(422, error.message, false).errorResponse(res);
-        })
+        let veryfiObjectId = await isValidObjectId(postId);
+        if(veryfiObjectId){
+            await postcardModel.findOne({_id: postId, created_by : authUser._id})
+            .then((doc:any)=>{
+                return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
+            }).catch((error: any)=>{
+              return new MyResponse(422, error.message, false).errorResponse(res);
+            })
+        } else {
+            return new MyResponse(406, "Invalid ObjectId", false).errorResponse(res);
+        }
+       
 
     } catch (error) {
         return new MyResponse(500, "server error", false).errorResponse(res);
