@@ -4,7 +4,7 @@ import { validationResult } from 'express-validator';
 import { ObjectId } from "mongoose";
 const MyResponse = require('../../helper/response');
 const { jwt_token } = require("../../helper/jwt");
-import isValidObjectId from "../../helper/validateObjectId"; 
+import isValidObjectId from "../../helper/validateObjectId";
 
 // interface for postcard
 interface PostcardInterface {
@@ -59,37 +59,62 @@ let createPostcard = async (req: Request, res: Response) => {
 let getPostCards = async (req: Request, res: Response) => {
     try {
         let authUser: any = req.headers.authUser;
+        let pageParam = req.query.page ? req.query.page : "1";
+        let limitParam = req.query.limit ? req.query.limit : "10";
+        let value = req.query.q ? req.query.q : "";
+        let filter = [];
 
-        await postcardModel.find({created_by : authUser._id})
-        .then((doc:any)=>{
-            return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
-        }).catch((error: any)=>{
-          return new MyResponse(422, error.message, false).errorResponse(res);
-        })
+        // query null value check
+        if (pageParam === "0" || limitParam === "0") {
+            return new MyResponse(422, "page and limit can't be 0.", false).errorResponse(res)
+        }
 
+        //convert string type into integer
+        let page = typeof pageParam === 'string' ? parseInt(pageParam, 10) : undefined;
+        let limit = typeof limitParam === 'string' ? parseInt(limitParam, 10) : undefined;
+        let skip = typeof page === "number" && page > 1 ? (page - 1) * (typeof limit === "number" ? limit : 0) : 0
+
+
+        // filtering data by recipient name, State, city and zipcode
+        !value ? filter.push({}) :
+            filter.push({ recipient: { $regex: value, $options: 'xi' } })
+        filter.push({ city: { $regex: value, $options: 'xi' } })
+        filter.push({ state: { $regex: value, $options: 'xi' } });
+        filter.push({ zipcode: { $regex: value, $options: 'xi' } });
+
+        await postcardModel.aggregate([{
+            $match: {
+                created_by: authUser._id,
+                $or: [...filter]
+            }
+        }]).sort({ created_at: -1 }).skip(skip).limit(limit)
+            .then((doc: any) => {
+                return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
+            }).catch((error: any) => {
+                return new MyResponse(422, error.message, false).errorResponse(res);
+            })
     } catch (error) {
         return new MyResponse(500, "server error", false).errorResponse(res);
-
     }
 }
 
 // ============= Get Postcard by id ================ 
-let getPostById = async (req:Request, res:Response) =>{
+let getPostById = async (req: Request, res: Response) => {
     try {
         let authUser: any = req.headers.authUser;
         let postId = req.params.id;
         let veryfiObjectId = await isValidObjectId(postId);
-        if(veryfiObjectId){
-            await postcardModel.findOne({_id: postId, created_by : authUser._id})
-            .then((doc:any)=>{
-                return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
-            }).catch((error: any)=>{
-              return new MyResponse(422, error.message, false).errorResponse(res);
-            })
+        if (veryfiObjectId) {
+            await postcardModel.findOne({ _id: postId, created_by: authUser._id })
+                .then((doc: any) => {
+                    return new MyResponse(200, "Post card retrieved successfully", true, doc).successResponse(res)
+                }).catch((error: any) => {
+                    return new MyResponse(422, error.message, false).errorResponse(res);
+                })
         } else {
             return new MyResponse(406, "Invalid ObjectId", false).errorResponse(res);
         }
-       
+
 
     } catch (error) {
         return new MyResponse(500, "server error", false).errorResponse(res);
