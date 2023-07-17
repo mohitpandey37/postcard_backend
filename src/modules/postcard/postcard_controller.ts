@@ -132,7 +132,8 @@ let getPostCardToken = async (req: Request, res: Response) => {
             await postcardModel.findOne({ _id: postId, created_by: authUser._id })
                 .then(async (doc: any) => {
                     let token = await getPostCardJwtToken(doc._id.toString())
-                    return new MyResponse(200, "Token generated.", true, { token: token }).successResponse(res)
+                    let link  = `http://localhost:3000/postcard/preview/${token}`;
+                    return new MyResponse(200, "Token generated.", true, { link: link }).successResponse(res)
                 }).catch((error: any) => {
                     return new MyResponse(422, error.message, false).errorResponse(res);
                 })

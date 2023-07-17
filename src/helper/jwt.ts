@@ -17,7 +17,7 @@ let jwtverify = (value: any) => {
 }
 
 let getPostCardJwtToken = (value: string)=>{
-   return jwt.sign({ id: value }, secret, { expiresIn: 60 });
+   return jwt.sign({ id: value }, secret, { expiresIn: "1D" });
 }
 
 // ====================== Verify Auth Token =================
